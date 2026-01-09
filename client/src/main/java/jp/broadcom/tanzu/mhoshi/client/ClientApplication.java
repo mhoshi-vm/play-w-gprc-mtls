@@ -1,5 +1,8 @@
 package jp.broadcom.tanzu.mhoshi.client;
 
+import io.grpc.NameResolverRegistry;
+import jakarta.annotation.PostConstruct;
+import jp.broadcom.tanzu.mhoshi.client.cf.PreferIPNameResolverProvider;
 import jp.broadcom.tanzu.mhoshi.server.proto.HelloReply;
 import jp.broadcom.tanzu.mhoshi.server.proto.HelloRequest;
 import jp.broadcom.tanzu.mhoshi.server.proto.SimpleGrpc;
@@ -28,12 +31,12 @@ public class ClientApplication implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         System.out.println(stub.sayHello(HelloRequest.newBuilder().setName("hello").build()));
-        Iterator<HelloReply> iterator = stub.streamHello(HelloRequest.newBuilder().setName("hello2").build());
-        while (iterator.hasNext()) {
-            // Read the current message and advance the iterator
-            String message = iterator.next().getMessage();
-            System.out.println("Message: " + message);
-        }
+//        Iterator<HelloReply> iterator = stub.streamHello(HelloRequest.newBuilder().setName("hello2").build());
+//        while (iterator.hasNext()) {
+//            // Read the current message and advance the iterator
+//            String message = iterator.next().getMessage();
+//            System.out.println("Message: " + message);
+//        }
 
         try {
             System.out.println(stub.sayHello(HelloRequest.newBuilder().setName("error").build()));
@@ -54,5 +57,10 @@ class ClientConfiguration {
     @Bean
     SimpleGrpc.SimpleBlockingStub stub(GrpcChannelFactory channels) {
         return SimpleGrpc.newBlockingStub(channels.createChannel("local"));
+    }
+    @PostConstruct
+    public void init() {
+        // Register the custom provider globally
+        NameResolverRegistry.getDefaultRegistry().register(new PreferIPNameResolverProvider());
     }
 }
