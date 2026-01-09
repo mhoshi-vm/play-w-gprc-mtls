@@ -35,3 +35,17 @@ Run the app
 ```
 ./mvnw spring-boot:run
 ```
+
+## Cloud Foundry
+
+```
+cd server/
+cf push
+```
+
+```
+cd client/
+cf push
+cf add-network-policy grpc-client grpc-server --protocol tcp --port 9090
+cf run-task grpc-client
+```
