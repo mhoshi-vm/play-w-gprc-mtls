@@ -3,26 +3,36 @@ package jp.broadcom.tanzu.mhoshi.client.cf;
 import io.grpc.EquivalentAddressGroup;
 import io.grpc.NameResolver;
 import io.grpc.Status;
+import io.grpc.StatusOr;
 
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
+import java.net.*;
 import java.util.Collections;
 
 class PreferIPNameResolver extends NameResolver {
 
-    private final String authority;
+
     private Listener2 listener;
+    private int port = 9090;
+    private String ip;
 
     PreferIPNameResolver(URI targetUri) {
-        this.authority = targetUri.getAuthority();
+        String authority = targetUri.getAuthority();
+        String host = "localhost";
+        if (authority != null) {
+            String[] authorityPort  = authority.split(":");
+            host = authorityPort[0];
+            port = authorityPort.length > 1 ? Integer.parseInt(authorityPort[1]): 9090;
+        }
+        try {
+            ip = InetAddress.getByName(host).getHostAddress();
+        } catch (UnknownHostException e) {
+            ip = "127.0.0.1";
+        }
     }
 
     @Override
     public String getServiceAuthority() {
-        return authority;
+        return ip;
     }
 
     @Override
@@ -42,22 +52,14 @@ class PreferIPNameResolver extends NameResolver {
             // --- YOUR CUSTOM LOGIC HERE ---
             // Example: "my-service" maps to localhost:9090
             // In reality, you might query a DB, K8s, or Consul here.
-
-            String[] authorityPort;
-            authorityPort = authority.splitWithDelimiters(":", 2);
-
-            String host = authorityPort[0];
-            String port = authorityPort.length == 3 ? authorityPort[2] : "9090";
-            String ip = InetAddress.getByName(host).getHostAddress();
-
-            SocketAddress socketAddress = new InetSocketAddress(ip, Integer.parseInt(port));
+            SocketAddress socketAddress = new InetSocketAddress(ip, port);
 
             // Wrap it in an EquivalentAddressGroup (EAG)
             EquivalentAddressGroup addressGroup = new EquivalentAddressGroup(socketAddress);
 
             // Pass the result to the listener as a ResolutionResult
             ResolutionResult result = ResolutionResult.newBuilder()
-                    .setAddresses(Collections.singletonList(addressGroup))
+                    .setAddressesOrError(StatusOr.fromValue(Collections.singletonList(addressGroup)))
                     .build();
 
             listener.onResult(result);

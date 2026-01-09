@@ -31,6 +31,6 @@ public class PreferIPNameResolverProvider extends NameResolverProvider {
 
     @Override
     protected int priority() {
-        return 10;
+        return 5;
     }
 }
