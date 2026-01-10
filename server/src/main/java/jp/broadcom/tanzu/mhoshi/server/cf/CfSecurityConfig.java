@@ -1,21 +1,16 @@
-package jp.broadcom.tanzu.mhoshi.server;
+package jp.broadcom.tanzu.mhoshi.server.cf;
 
-import jp.broadcom.tanzu.mhoshi.server.cf.CfIdentity;
-import jp.broadcom.tanzu.mhoshi.server.cf.CfIdentityExtractor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.grpc.server.GlobalServerInterceptor;
 import org.springframework.grpc.server.security.AuthenticationProcessInterceptor;
 import org.springframework.grpc.server.security.GrpcSecurity;
-import org.springframework.grpc.server.security.PreAuthConfigurer;
 import org.springframework.grpc.server.security.SslContextPreAuthenticationExtractor;
 import org.springframework.security.config.Customizer;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 @Configuration
-class GrpcSecurityConfig {
+class CfSecurityConfig {
 
     @Bean
     @GlobalServerInterceptor

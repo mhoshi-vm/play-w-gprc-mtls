@@ -38,16 +38,16 @@ public class ClientApplication implements CommandLineRunner {
 //            System.out.println("Message: " + message);
 //        }
 
-        try {
-            System.out.println(stub.sayHello(HelloRequest.newBuilder().setName("error").build()));
-        }catch (Exception e){
-            e.printStackTrace();
-        }
-        try {
-          System.out.println(stub.sayHello(HelloRequest.newBuilder().setName("internal").build()));
-        }catch (Exception e){
-            e.printStackTrace();
-        }
+//        try {
+//            System.out.println(stub.sayHello(HelloRequest.newBuilder().setName("error").build()));
+//        }catch (Exception e){
+//            e.printStackTrace();
+//        }
+//        try {
+//          System.out.println(stub.sayHello(HelloRequest.newBuilder().setName("internal").build()));
+//        }catch (Exception e){
+//            e.printStackTrace();
+//        }
 
     }
 }

@@ -9,8 +9,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import static jp.broadcom.tanzu.mhoshi.server.cf.CfIdentityExtractor.SEPARATOR;
 
-
-public final class CfIdentity implements UserDetails {
+final class CfIdentity implements UserDetails {
 
 	private final String subject;
 
