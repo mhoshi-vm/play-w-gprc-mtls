@@ -18,28 +18,18 @@ public record CfCertificate(
     CfCertificate(X509Certificate clientCert) {
         // 2. The logic must be inline or via static helper methods inside this()
         this(
-            clientCert.getSubjectX500Principal().getName()
+                clientCert.getSubjectX500Principal().getName()
         );
     }
 
-    CfCertificate(String  subject) {
+    CfCertificate(String subject) {
         // 2. The logic must be inline or via static helper methods inside this()
         this(
-            subject,
-            extractGuid(APP_PATTERN, subject),
-            extractGuid(SPACE_PATTERN, subject),
-            extractGuid(ORG_PATTERN, subject)
+                subject,
+                extractGuid(APP_PATTERN, subject),
+                extractGuid(SPACE_PATTERN, subject),
+                extractGuid(ORG_PATTERN, subject)
         );
-    }
-
-    boolean matchesSpace(CfCertificate other) {
-        if (other == null) {
-            return false;
-        }
-        // We use Objects.equals for Strings/Objects to handle nulls safely
-        // We use == for primitives like int or double (though we aren't comparing price here)
-        return Objects.equals(this.spaceGuid, other.spaceGuid) &&
-               Objects.equals(this.organizationGuid, other.organizationGuid);
     }
 
     private static String extractGuid(Pattern pattern, String subject) {
@@ -49,6 +39,16 @@ public record CfCertificate(
         } else {
             return "";
         }
+    }
+
+    boolean matchesSpace(CfCertificate other) {
+        if (other == null) {
+            return false;
+        }
+        // We use Objects.equals for Strings/Objects to handle nulls safely
+        // We use == for primitives like int or double (though we aren't comparing price here)
+        return Objects.equals(this.spaceGuid, other.spaceGuid) &&
+                Objects.equals(this.organizationGuid, other.organizationGuid);
     }
 }
 

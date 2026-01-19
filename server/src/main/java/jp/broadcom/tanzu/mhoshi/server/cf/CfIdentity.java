@@ -1,11 +1,11 @@
 package jp.broadcom.tanzu.mhoshi.server.cf;
 
-import java.util.Collection;
-import java.util.Objects;
-
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.userdetails.UserDetails;
+
+import java.util.Collection;
+import java.util.Objects;
 
 record CfIdentity(CfCertificate cfCertificate, CfCertificate serverCertificate) implements UserDetails {
 

@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 @Service
 class GrpcServerService extends SimpleGrpc.SimpleImplBase {
 
-    private static Log log = LogFactory.getLog(GrpcServerService.class);
+    private static final Log log = LogFactory.getLog(GrpcServerService.class);
 
     @Override
     public void sayHello(HelloRequest req, StreamObserver<HelloReply> responseObserver) {

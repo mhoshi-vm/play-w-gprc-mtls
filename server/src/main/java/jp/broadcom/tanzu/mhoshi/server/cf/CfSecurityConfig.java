@@ -38,7 +38,7 @@ class CfSecurityConfig {
             String alias = "self-signed";
             X509Certificate cert = (X509Certificate) keyStore.getCertificate(alias);
             return new CfCertificate(cert);
-        }catch (Exception e){
+        } catch (Exception e) {
             return null;
         }
     }
