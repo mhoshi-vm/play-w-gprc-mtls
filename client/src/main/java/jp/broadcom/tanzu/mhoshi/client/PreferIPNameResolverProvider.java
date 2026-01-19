@@ -1,4 +1,4 @@
-package jp.broadcom.tanzu.mhoshi.client.cf;
+package jp.broadcom.tanzu.mhoshi.client;
 
 import io.grpc.NameResolver;
 import io.grpc.NameResolverProvider;

@@ -8,31 +8,9 @@ import org.springframework.security.web.authentication.preauth.x509.X509Principa
 
 class CfIdentityExtractor implements X509PrincipalExtractor {
 
-	static String SEPARATOR = ":";
-
-	private static final Pattern appPattern = Pattern.compile("OU=app:([a-fA-F0-9\\-]+)");
-
-	private static final Pattern spacePattern = Pattern.compile("OU=space:([a-fA-F0-9\\-]+)");
-
-	private static final Pattern orgPattern = Pattern.compile("OU=organization:([a-fA-F0-9\\-]+)");
-
 	@Override
 	public Object extractPrincipal(X509Certificate clientCert) {
-		String subject = clientCert.getSubjectX500Principal().getName();
-		String appGuid = extractGuid(appPattern, subject);
-		String spaceGuid = extractGuid(spacePattern, subject);
-		String organizationGuid = extractGuid(orgPattern, subject);
-		return String.join(SEPARATOR, organizationGuid, spaceGuid, appGuid);
-	}
-
-	private static String extractGuid(Pattern pattern, String subject) {
-		Matcher matcher = pattern.matcher(subject);
-		if (matcher.find()) {
-			return matcher.group(1);
-		}
-		else {
-			return "";
-		}
+		return new CfCertificate(clientCert).subject();
 	}
 
 }

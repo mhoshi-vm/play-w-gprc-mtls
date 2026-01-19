@@ -3,6 +3,9 @@ CLIENT_DIR=$PWD/client/src/main/resources/self-signed
 mkdir -p ${SERVER_DIR}
 mkdir -p ${CLIENT_DIR}
 
+SPACE_UUID=`uuidgen`
+ORG_UUID=`uuidgen`
+
 # Create CA certificate
 openssl req -new -nodes -out ${SERVER_DIR}/ca.csr -keyout ${SERVER_DIR}/ca.key -subj "/CN=demo/O=tanzu/C=JP"
 chmod og-rwx ${SERVER_DIR}/ca.key
@@ -24,12 +27,14 @@ DNS.1 = localhost
 EOF
 
 # Create Server certificate signed by CA
-openssl req -new -nodes -out ${SERVER_DIR}/server.csr -keyout ${SERVER_DIR}/server.key -subj "/CN=localhost"
+openssl req -new -nodes -out ${SERVER_DIR}/server.csr -keyout ${SERVER_DIR}/server.key -subj "/OU=app:`uuidgen`/OU=space:${SPACE_UUID}/OU=organization:${ORG_UUID}/CN=localhost"
 chmod og-rwx ${SERVER_DIR}/server.key
 openssl x509 -req -in ${SERVER_DIR}/server.csr -days 3650 -CA ${SERVER_DIR}/ca.crt -CAkey ${SERVER_DIR}/ca.key -CAcreateserial -out ${SERVER_DIR}/server.crt -extfile ${SERVER_DIR}/ext.txt
 
 # Create Client certificate signed by CA
-openssl req -new -nodes -out ${CLIENT_DIR}/client.csr -keyout ${CLIENT_DIR}/client.key -subj "/OU=app:02756191-d869-4806-9717-a6eec5142e8a/OU=space:6755b19d-c543-4e0c-a4b3-cd6e7c9c68a3/OU=organization:4b84793c-f3ea-4a55-92b7-942726aac163/CN=5b713474-27b5-435c-42b6-1f17"
+openssl req -new -nodes -out ${CLIENT_DIR}/client.csr -keyout ${CLIENT_DIR}/client.key -subj "/OU=app:`uuidgen`/OU=space:${SPACE_UUID}/OU=organization:${ORG_UUID}/CN=localhost"
+# Test invalid certificate by creating a random space uuid
+# openssl req -new -nodes -out ${CLIENT_DIR}/client.csr -keyout ${CLIENT_DIR}/client.key -subj "/OU=app:`uuidgen`/OU=space:`uuidgen`/OU=organization:${ORG_UUID}/CN=localhost"
 chmod og-rwx ${CLIENT_DIR}/client.key
 openssl x509 -req -in ${CLIENT_DIR}/client.csr -days 3650 -CA ${SERVER_DIR}/ca.crt -CAkey ${SERVER_DIR}/ca.key -CAcreateserial -out ${CLIENT_DIR}/client.crt -extfile ${SERVER_DIR}/ext.txt
 cp ${SERVER_DIR}/ca.crt ${CLIENT_DIR}/ca.crt

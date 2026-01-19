@@ -1,4 +1,4 @@
-package jp.broadcom.tanzu.mhoshi.client.cf;
+package jp.broadcom.tanzu.mhoshi.client;
 
 import io.grpc.EquivalentAddressGroup;
 import io.grpc.NameResolver;
@@ -19,9 +19,9 @@ class PreferIPNameResolver extends NameResolver {
         String authority = targetUri.getAuthority();
         String host = "localhost";
         if (authority != null) {
-            String[] authorityPort  = authority.split(":");
+            String[] authorityPort = authority.split(":");
             host = authorityPort[0];
-            port = authorityPort.length > 1 ? Integer.parseInt(authorityPort[1]): 9090;
+            port = authorityPort.length > 1 ? Integer.parseInt(authorityPort[1]) : 9090;
         }
         try {
             ip = InetAddress.getByName(host).getHostAddress();
