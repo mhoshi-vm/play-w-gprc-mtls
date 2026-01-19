@@ -1,5 +1,7 @@
 package jp.broadcom.tanzu.mhoshi.server.cf;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.ssl.SslBundle;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
@@ -15,6 +17,7 @@ import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 
 @Configuration
+@ConditionalOnProperty(name = "spring.grpc.server.ssl.bundle")
 class CfSecurityConfig {
 
     @Bean
@@ -30,17 +33,25 @@ class CfSecurityConfig {
     }
 
     @Bean
-    CfCertificate serverCfCertificate(SslBundles sslBundles) {
-        SslBundle bundle = sslBundles.getBundle("self-signed");
+    CfCertificate serverCfCertificate(SslBundles sslBundles,
+                                      @Value("${spring.grpc.server.ssl.bundle}") String bundleName,
+                                      @Value("${spring.ssl.bundle.pem.${spring.grpc.server.ssl.bundle}.key.alias}") String aliasName) {
+
+        SslBundle bundle = sslBundles.getBundle(bundleName);
         KeyStore keyStore = bundle.getStores().getKeyStore();
 
         try {
-            String alias = "self-signed";
-            X509Certificate cert = (X509Certificate) keyStore.getCertificate(alias);
-            return new CfCertificate(cert);
+            X509Certificate cert = null;
+            if (keyStore != null) {
+                cert = (X509Certificate) keyStore.getCertificate(aliasName);
+            }
+            if (cert != null) {
+                return new CfCertificate(cert);
+            }
         } catch (Exception e) {
             return null;
         }
+        return null;
     }
 
     @Bean

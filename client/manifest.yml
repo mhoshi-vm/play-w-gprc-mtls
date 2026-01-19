@@ -4,10 +4,9 @@ applications:
     buildpacks:
       - java_buildpack_offline
     memory: 1G
-    instances: 0
+    instances: 1
     path: target/client-0.0.1-SNAPSHOT.jar
     health-check-type: process
     no-route: true
     env:
       JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'
-      SPRING_PROFILES_ACTIVE: 'cf'

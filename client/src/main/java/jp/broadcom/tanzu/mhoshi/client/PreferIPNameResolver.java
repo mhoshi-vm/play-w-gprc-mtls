@@ -5,73 +5,90 @@ import io.grpc.NameResolver;
 import io.grpc.Status;
 import io.grpc.StatusOr;
 
-import java.net.*;
+import java.net.InetSocketAddress;
+import java.net.URI;
 import java.util.Collections;
 
 class PreferIPNameResolver extends NameResolver {
 
-
+    private final String host;
+    private final int port;
+    // Volatile ensures that if 'refresh()' updates the IP, other threads see it immediately
+    private volatile String ip;
     private Listener2 listener;
-    private int port = 9090;
-    private String ip;
 
     PreferIPNameResolver(URI targetUri) {
         String authority = targetUri.getAuthority();
-        String host = "localhost";
+        String parsedHost = "localhost";
+        int parsedPort = 9090;
+
         if (authority != null) {
             String[] authorityPort = authority.split(":");
-            host = authorityPort[0];
-            port = authorityPort.length > 1 ? Integer.parseInt(authorityPort[1]) : 9090;
+            parsedHost = authorityPort[0];
+            parsedPort = authorityPort.length > 1 ? Integer.parseInt(authorityPort[1]) : 9090;
         }
-        try {
-            ip = InetAddress.getByName(host).getHostAddress();
-        } catch (UnknownHostException e) {
-            ip = "127.0.0.1";
-        }
+
+        this.host = parsedHost;
+        this.port = parsedPort;
+
+        // 1. BLOCKING RESOLUTION (Required for your use case)
+        // We must resolve here so 'ip' is available for getServiceAuthority() immediately.
+        resolveInternal(true);
     }
 
     @Override
     public String getServiceAuthority() {
+        // 2. Returns the IP address as requested
         return ip;
     }
 
     @Override
     public void start(Listener2 listener) {
         this.listener = listener;
-        resolve();
+        // Push the result we calculated in the constructor
+        pushResult();
     }
 
     @Override
     public void refresh() {
-        resolve();
+        // 3. On refresh, we re-resolve to get the latest IP (in case DNS changed)
+        resolveInternal(false);
+        pushResult();
     }
 
-    private void resolve() {
+    // Helper to perform the DNS lookup
+    private void resolveInternal(boolean isConstructor) {
         try {
+            // This performs a DNS lookup (blocking)
+            InetSocketAddress tempAddr = new InetSocketAddress(host, port);
+            if (!tempAddr.isUnresolved()) {
+                this.ip = tempAddr.getAddress().getHostAddress();
+            }
+        } catch (Exception e) {
+            listener.onError(Status.UNAVAILABLE.withDescription("DNS Resolution failed: " + e.getMessage()));
+        }
+    }
 
-            // --- YOUR CUSTOM LOGIC HERE ---
-            // Example: "my-service" maps to localhost:9090
-            // In reality, you might query a DB, K8s, or Consul here.
-            SocketAddress socketAddress = new InetSocketAddress(ip, port);
+    private void pushResult() {
+        if (listener == null) return;
 
-            // Wrap it in an EquivalentAddressGroup (EAG)
+        try {
+            // Use the stored 'ip' to create the connection target
+            InetSocketAddress socketAddress = new InetSocketAddress(ip, port);
             EquivalentAddressGroup addressGroup = new EquivalentAddressGroup(socketAddress);
 
-            // Pass the result to the listener as a ResolutionResult
             ResolutionResult result = ResolutionResult.newBuilder()
                     .setAddressesOrError(StatusOr.fromValue(Collections.singletonList(addressGroup)))
                     .build();
 
             listener.onResult(result);
-
         } catch (Exception e) {
-            // Notify gRPC of the error
-            listener.onError(Status.UNAVAILABLE.withDescription("Failed to resolve: " + e.getMessage()));
+            listener.onError(Status.UNAVAILABLE.withDescription("Failed to construct address: " + e.getMessage()));
         }
     }
 
     @Override
     public void shutdown() {
-        // Clean up resources (e.g., stop background threads/timers)
+        // No resources to clean up in synchronous mode
     }
 }

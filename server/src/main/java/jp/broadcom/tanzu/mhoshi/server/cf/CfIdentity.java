@@ -1,5 +1,6 @@
 package jp.broadcom.tanzu.mhoshi.server.cf;
 
+import org.jspecify.annotations.NullMarked;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -14,6 +15,7 @@ record CfIdentity(CfCertificate cfCertificate, CfCertificate serverCertificate) 
     }
 
     @Override
+    @NullMarked
     public Collection<? extends GrantedAuthority> getAuthorities() {
         if (cfCertificate.matchesSpace(serverCertificate)) {
             return AuthorityUtils.createAuthorityList("ROLE_APP");
@@ -27,6 +29,7 @@ record CfIdentity(CfCertificate cfCertificate, CfCertificate serverCertificate) 
     }
 
     @Override
+    @NullMarked
     public String getUsername() {
         return cfCertificate.subject();
     }
