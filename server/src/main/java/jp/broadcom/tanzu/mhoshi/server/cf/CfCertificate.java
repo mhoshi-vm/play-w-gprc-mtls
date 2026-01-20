@@ -33,7 +33,7 @@ record CfCertificate(
         return null;
     }
 
-    public boolean matchesSpace(CfCertificate other) {
+    boolean matchesSpace(CfCertificate other) {
         if (other == null) return false;
         if (this.spaceGuid == null || this.organizationGuid == null) return false;
         return Objects.equals(this.spaceGuid, other.spaceGuid) &&
