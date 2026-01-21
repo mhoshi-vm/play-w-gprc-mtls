@@ -12,3 +12,4 @@ applications:
         protocol: http2
     env:
       JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'
+      SPRING_PROFILES_ACTIVE: 'cloud'
