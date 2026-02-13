@@ -9,7 +9,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.grpc.server.GlobalServerInterceptor;
 import org.springframework.grpc.server.security.AuthenticationProcessInterceptor;
 import org.springframework.grpc.server.security.GrpcSecurity;
-import org.springframework.grpc.server.security.SslContextPreAuthenticationExtractor;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.core.userdetails.UserDetailsService;
 
@@ -17,7 +16,7 @@ import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 
 @Configuration
-@ConditionalOnProperty(name = "spring.grpc.server.ssl.bundle")
+@ConditionalOnProperty(name = "cf.bundle.name")
 class CfSecurityConfig {
 
     @Bean
@@ -27,15 +26,15 @@ class CfSecurityConfig {
                 .authorizeRequests(requests -> requests
                         .methods("Simple/SayHello").hasAnyAuthority("ROLE_APP")
                         .allRequests().permitAll())
-                .authenticationExtractor(new SslContextPreAuthenticationExtractor(new CfIdentityExtractor()))
+                .authenticationExtractor(new CfIdentityExtractor())
                 .preauth(Customizer.withDefaults())
                 .build();
     }
 
     @Bean
     CfCertificate serverCfCertificate(SslBundles sslBundles,
-                                      @Value("${spring.grpc.server.ssl.bundle}") String bundleName,
-                                      @Value("${spring.ssl.bundle.pem.${spring.grpc.server.ssl.bundle}.key.alias}") String aliasName) {
+                                      @Value("${cf.bundle.name}") String bundleName,
+                                      @Value("${spring.ssl.bundle.pem.${cf.bundle.name}.key.alias}") String aliasName) {
 
         SslBundle bundle = sslBundles.getBundle(bundleName);
         KeyStore keyStore = bundle.getStores().getKeyStore();
