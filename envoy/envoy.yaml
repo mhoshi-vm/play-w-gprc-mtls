@@ -1,77 +1,107 @@
 static_resources:
   listeners:
-  - name: listener_0
-    address:
-      socket_address:
-        address: 0.0.0.0
-        port_value: 10000
-    filter_chains:
-    - filters:
-      - name: envoy.filters.network.http_connection_manager
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          stat_prefix: ingress_http
+    - name: listener_0
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 10000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
 
-          # --- XFCC Configuration ---
-          # SANITIZE_SET resets the header so the backend trusts it comes from Envoy
-          forward_client_cert_details: SANITIZE_SET
-          set_current_client_cert_details:
-            subject: true
-            cert: true   # <--- Puts the full URL-encoded PEM in the header
-            dns: true
-            uri: true
-          # --------------------------
+                # --- XFCC Configuration ---
+                # SANITIZE_SET resets the header so the backend trusts it comes from Envoy
+                forward_client_cert_details: SANITIZE_SET
+                set_current_client_cert_details:
+                  subject: false
+                  cert: true   # <--- Puts the full URL-encoded PEM in the header
+                  dns: false
+                  uri: false
+                # --------------------------
 
-          http2_protocol_options: {} # Required for gRPC
-          route_config:
-            name: local_route
-            virtual_hosts:
-            - name: local_service
-              domains: ["*"]
-              routes:
-              - match:
-                  prefix: "/"
-                route:
-                  cluster: grpc_backend
-                  max_stream_duration:
-                    grpc_timeout_header_max: 0s
-          http_filters:
-          - name: envoy.filters.http.router
+                http2_protocol_options: { } # Required for gRPC
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: local_service
+                      domains: [ "*" ]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: grpc_backend
+                            max_stream_duration:
+                              grpc_timeout_header_max: 0s
+                http_filters:
+                  - name: envoy.filters.http.lua
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+                      inline_code: |
+                        function envoy_on_request(request_handle)
+                          -- Grab the native XFCC header injected by Envoy
+                          local xfcc = request_handle:headers():get("x-forwarded-client-cert")
+                        
+                          if xfcc then
+                            -- Extract the URL-encoded PEM from Envoy's format
+                            local cert = xfcc:match('Cert="([^"]+)"')
+                        
+                            if cert then
+                              -- 1. Decode the URL encoding 
+                              cert = cert:gsub("%%(%x%x)", function(h) 
+                                return string.char(tonumber(h, 16)) 
+                              end)
+                        
+                              -- 2. Strip the PEM boundaries
+                              cert = cert:gsub("%-%-%-%-%-BEGIN CERTIFICATE%-%-%-%-%-", "")
+                              cert = cert:gsub("%-%-%-%-%-END CERTIFICATE%-%-%-%-%-", "")
+                        
+                              -- 3. Strip all whitespace and newlines to get pure Base64
+                              cert = cert:gsub("%s+", "")
+                        
+                              -- 4. Replace the Envoy header with the Gorouter-compatible string
+                              request_handle:headers():replace("x-forwarded-client-cert", cert)
+                            end
+                          end
+                        end
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          transport_socket:
+            name: envoy.transport_sockets.tls
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-      transport_socket:
-        name: envoy.transport_sockets.tls
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-          require_client_certificate: true  # Enforce mTLS
-          common_tls_context:
-            alpn_protocols: ["h2"]
-            tls_certificates:
-            - certificate_chain:
-                filename: "../server/src/main/resources/self-signed/server.crt"
-              private_key:
-                filename: "../server/src/main/resources/self-signed/server.key"
-            validation_context:
-              trusted_ca:
-                filename: "../server/src/main/resources/self-signed/ca.crt"
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+              require_client_certificate: true  # Enforce mTLS
+              common_tls_context:
+                alpn_protocols: [ "h2" ]
+                tls_certificates:
+                  - certificate_chain:
+                      filename: "../server/src/main/resources/self-signed/server.crt"
+                    private_key:
+                      filename: "../server/src/main/resources/self-signed/server.key"
+                validation_context:
+                  trusted_ca:
+                    filename: "../server/src/main/resources/self-signed/ca.crt"
 
   clusters:
-  - name: grpc_backend
-    connect_timeout: 0.25s
-    type: LOGICAL_DNS
-    # Explicitly use HTTP/2 for the backend connection
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: grpc_backend
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: localhost
-                port_value: 9090
+    - name: grpc_backend
+      connect_timeout: 0.25s
+      type: LOGICAL_DNS
+      # Explicitly use HTTP/2 for the backend connection
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: { }
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: grpc_backend
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: localhost
+                      port_value: 8080

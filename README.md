@@ -38,6 +38,8 @@ Run the app
 
 ## Cloud Foundry
 
+Must make go router as tls termination point
+
 ```
 cd server/
 cf push
@@ -48,4 +50,11 @@ cd client/
 cf push
 cf add-network-policy grpc-client grpc-server --protocol tcp --port 9090
 cf run-task grpc-client
+```
+
+## Cloud Foundry Mock
+
+```
+cd envoy
+envoy -c envoy.yaml
 ```
