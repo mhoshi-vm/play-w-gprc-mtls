@@ -9,3 +9,4 @@ applications:
     env:
       JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'
       SPRING_PROFILES_ACTIVE: 'cloud'
+      SPRING_GRPC_CLIENT_CHANNELS_LOCAL_ADDRESS: static://grpc-server.((domain)):443

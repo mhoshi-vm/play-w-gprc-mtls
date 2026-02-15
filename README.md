@@ -42,7 +42,7 @@ Must make go router as tls termination point
 
 ```
 cd server/
-cf push
+cf push --var domain=APP_DOMAIN
 ```
 
 ```
