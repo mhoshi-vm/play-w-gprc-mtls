@@ -1,8 +1,12 @@
 package jp.broadcom.tanzu.mhoshi.client.cf;
 
 import io.grpc.TlsChannelCredentials;
+import io.grpc.netty.GrpcSslContexts;
+import io.grpc.netty.NettySslContextChannelCredentials;
 import io.grpc.util.AdvancedTlsX509KeyManager;
-
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,11 +17,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.grpc.client.ChannelCredentialsProvider;
 
+import javax.net.ssl.SSLException;
 import java.security.*;
 import java.security.cert.X509Certificate;
 
 @Configuration
-@ConditionalOnProperty(name="spring.grpc.client.channels.local.ssl.bundle")
+@ConditionalOnProperty(name = "spring.grpc.client.channels.local.ssl.bundle")
 class CfClientCertificateConfig {
 
     Logger log = LoggerFactory.getLogger(CfClientCertificateConfig.class);
@@ -44,6 +49,15 @@ class CfClientCertificateConfig {
         return keyManager;
     }
 
+    /**
+     * Provides a {@link ChannelCredentialsProvider} that plugs the dynamic
+     * {@link AdvancedTlsX509KeyManager} into the Netty SSL context.
+     *
+     * <p>Because Spring gRPC's auto-configured {@code NamedChannelCredentialsProvider} is
+     * annotated with {@code @ConditionalOnMissingBean(ChannelCredentialsProvider.class)},
+     * declaring this bean causes the auto-configured provider to be skipped — so every
+     * gRPC channel will use our key manager with transparent cert hot-reload.
+     */
     @Bean
     ChannelCredentialsProvider grpcChannelCredentialsProvider(SslBundles sslBundles,
                                                               @Value("${spring.grpc.client.channels.local.ssl.bundle}") String bundleName,
@@ -56,6 +70,19 @@ class CfClientCertificateConfig {
                     .trustManager(bundle.getManagers().getTrustManagerFactory().getTrustManagers())
                     .build();
         };
+//        return channelName -> {
+//            try {
+//                SslBundle bundle = sslBundles.getBundle(bundleName);
+//                SslContext ssl = GrpcSslContexts
+//                        .configure(SslContextBuilder.forClient(), SslProvider.JDK)
+//                        .keyManager(keyManager)
+//                        .trustManager(bundle.getManagers().getTrustManagerFactory())
+//                        .build();
+//                return NettySslContextChannelCredentials.create(ssl);
+//            } catch (SSLException e) {
+//                throw new IllegalStateException("Cannot build gRPC channel credentials", e);
+//            }
+//        };
     }
 
     private void updateKeyManager(AdvancedTlsX509KeyManager keyManager, SslBundle bundle,

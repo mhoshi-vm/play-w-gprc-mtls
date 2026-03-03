@@ -1,32 +1,18 @@
 package jp.broadcom.tanzu.mhoshi.client;
 
-import io.grpc.Grpc;
-import io.grpc.ManagedChannel;
-import io.grpc.Metadata;
-import io.grpc.ServerCall;
-import io.grpc.ServerCallHandler;
-import io.grpc.ServerInterceptor;
+import io.grpc.*;
 import io.grpc.netty.GrpcSslContexts;
-import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.util.AdvancedTlsX509KeyManager;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import jp.broadcom.tanzu.mhoshi.server.proto.HelloReply;
 import jp.broadcom.tanzu.mhoshi.server.proto.HelloRequest;
 import jp.broadcom.tanzu.mhoshi.server.proto.SimpleGrpc;
 import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x509.BasicConstraints;
-import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
-import org.bouncycastle.asn1.x509.Extension;
-import org.bouncycastle.asn1.x509.GeneralName;
-import org.bouncycastle.asn1.x509.GeneralNames;
-import org.bouncycastle.asn1.x509.KeyPurposeId;
-import org.bouncycastle.asn1.x509.KeyUsage;
-import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.asn1.x509.*;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -51,12 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.SecureRandom;
-import java.security.Security;
+import java.security.*;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.concurrent.CountDownLatch;
@@ -104,16 +85,24 @@ class CertHotReloadTest {
     @TempDir
     static Path certDir;
 
-    /** Port the embedded gRPC server listens on. */
+    /**
+     * Port the embedded gRPC server listens on.
+     */
     static int grpcPort;
 
-    /** Stores the most-recently-observed client cert serial from the server side. */
+    /**
+     * Stores the most-recently-observed client cert serial from the server side.
+     */
     static final AtomicReference<BigInteger> lastClientSerial = new AtomicReference<>();
 
-    /** Embedded gRPC server. */
+    /**
+     * Embedded gRPC server.
+     */
     static io.grpc.Server grpcServer;
 
-    /** Server-side SSL context (trusts our ephemeral test CA, requires client certs). */
+    /**
+     * Server-side SSL context (trusts our ephemeral test CA, requires client certs).
+     */
     static SslContext serverSslContext;
 
     /**
@@ -196,45 +185,6 @@ class CertHotReloadTest {
         }
     }
 
-//    /**
-//     * Provides a {@link ChannelCredentialsProvider} that plugs the dynamic
-//     * {@link AdvancedTlsX509KeyManager} into the Netty SSL context.
-//     *
-//     * <p>Because Spring gRPC's auto-configured {@code NamedChannelCredentialsProvider} is
-//     * annotated with {@code @ConditionalOnMissingBean(ChannelCredentialsProvider.class)},
-//     * declaring this bean causes the auto-configured provider to be skipped — so every
-//     * gRPC channel will use our key manager with transparent cert hot-reload.
-//     *
-//     * <p>JDK SSL is forced so that {@code X509ExtendedKeyManager.getCertificateChain()} is
-//     * called per-handshake (BoringSSL caches key material at {@code SslContext} build time
-//     * and would not pick up the rotated cert).
-//     *
-//     * <p>{@code InsecureTrustManagerFactory} is intentional: this test exercises client-cert
-//     * rotation, not server-cert validation.
-//     */
-//    @TestConfiguration
-//    static class DynamicKeyManagerConfig {
-//
-////        @Bean
-////        ChannelCredentialsProvider grpcChannelCredentialsProvider(
-////                AdvancedTlsX509KeyManager keyManager) {
-////            return channelName -> buildChannelCredentials(keyManager);
-////        }
-//
-////        private static ChannelCredentials buildChannelCredentials(
-////                AdvancedTlsX509KeyManager keyManager) {
-////            try {
-////                SslContext ssl = GrpcSslContexts
-////                        .configure(SslContextBuilder.forClient(), SslProvider.JDK)
-////                        .keyManager(keyManager)
-////                        .trustManager(InsecureTrustManagerFactory.INSTANCE)
-////                        .build();
-////                return NettySslContextChannelCredentials.create(ssl);
-////            } catch (SSLException e) {
-////                throw new IllegalStateException("Cannot build gRPC channel credentials", e);
-////            }
-////        }
-//    }
 
     // ── injected beans ────────────────────────────────────────────────────────
 
@@ -317,42 +267,19 @@ class CertHotReloadTest {
                 .isNotEqualTo(serialBefore);
 
         // ── Phase 6: prove the new cert is used on a fresh gRPC connection ───
-        //
-        // The shared Spring gRPC channel reuses an existing HTTP/2 connection that was
-        // established with the OLD cert. A fresh ManagedChannel has no TLS session cache,
-        // so the first connection is always a full TLS handshake.
-        //
-        // We extract the rotated key/cert explicitly from the key manager *after* rotation
-        // and bake them into a new Netty SslContext (built post-rotation so BoringSSL/JDK
-        // picks up the new material at context-build time). We use NettyChannelBuilder
-        // directly (same non-shaded Netty transport as the server and the Spring channel)
-        // to avoid SPI provider selection surprises from Grpc.newChannelBuilderForAddress.
+        HelloReply reply2 = stub.sayHello(HelloRequest.newBuilder().setName("hello-v2").build());
+        assertThat(reply2.getMessage()).contains("hello-v2");
 
-        X509Certificate[] rotatedChain = keyManager.getCertificateChain("default");
-        PrivateKey rotatedKey = keyManager.getPrivateKey("default");
-        SslContext freshSsl = GrpcSslContexts.forClient()
-                .keyManager(rotatedKey, rotatedChain)
-                .trustManager(InsecureTrustManagerFactory.INSTANCE)
-                .build();
-        ManagedChannel freshChannel = NettyChannelBuilder.forAddress("localhost", grpcPort)
-                .sslContext(freshSsl)
-                .build();
-        try {
-            HelloReply reply2 = SimpleGrpc.newBlockingStub(freshChannel)
-                    .sayHello(HelloRequest.newBuilder().setName("hello-v2").build());
-            assertThat(reply2.getMessage()).contains("hello-v2");
-
-            assertThat(lastClientSerial.get())
-                    .as("Server must observe the rotated certificate on the fresh connection")
-                    .isEqualTo(serialAfter);
-        } finally {
-            freshChannel.shutdownNow();
-        }
+        assertThat(lastClientSerial.get())
+                .as("Server must observe the rotated certificate on the fresh connection")
+                .isEqualTo(serialAfter);
     }
 
     // ── server helpers ────────────────────────────────────────────────────────
 
-    /** Starts the embedded gRPC server. */
+    /**
+     * Starts the embedded gRPC server.
+     */
     static io.grpc.Server startServer() throws Exception {
         return NettyServerBuilder.forPort(0)
                 .sslContext(serverSslContext)

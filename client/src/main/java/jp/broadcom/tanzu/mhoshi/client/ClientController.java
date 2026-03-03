@@ -18,7 +18,6 @@ class ClientController {
     public void run() {
         System.out.println(stub.sayHello(HelloRequest.newBuilder().setName("hello").build()));
 
-
 //        Iterator<HelloReply> iterator = stub.streamHello(HelloRequest.newBuilder().setName("hello2").build());
 //        while (iterator.hasNext()) {
 //            // Read the current message and advance the iterator
