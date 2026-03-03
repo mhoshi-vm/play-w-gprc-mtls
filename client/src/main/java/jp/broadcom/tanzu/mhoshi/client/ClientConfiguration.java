@@ -1,12 +1,7 @@
 package jp.broadcom.tanzu.mhoshi.client;
 
-import io.grpc.netty.GrpcSslContexts;
-import io.grpc.netty.NettySslContextChannelCredentials;
+import io.grpc.TlsChannelCredentials;
 import io.grpc.util.AdvancedTlsX509KeyManager;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SslProvider;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import jp.broadcom.tanzu.mhoshi.server.proto.SimpleGrpc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,10 +13,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.grpc.client.ChannelCredentialsProvider;
 import org.springframework.grpc.client.GrpcChannelFactory;
 
-import javax.net.ssl.SSLException;
 import java.security.*;
 import java.security.cert.X509Certificate;
-import java.util.List;
 
 @Configuration
 class ClientConfiguration {
@@ -56,18 +49,16 @@ class ClientConfiguration {
     }
 
     @Bean
-    ChannelCredentialsProvider grpcChannelCredentialsProvider(AdvancedTlsX509KeyManager keyManager) {
+    ChannelCredentialsProvider grpcChannelCredentialsProvider(SslBundles sslBundles,
+                                                              @Value("${spring.grpc.client.channels.local.ssl.bundle}") String bundleName,
+                                                              AdvancedTlsX509KeyManager keyManager) {
+
         return channelName -> {
-            try {
-                SslContext ssl = GrpcSslContexts
-                        .configure(SslContextBuilder.forClient(), SslProvider.JDK)
-                        .keyManager(keyManager)
-                        .trustManager(InsecureTrustManagerFactory.INSTANCE)
-                        .build();
-                return NettySslContextChannelCredentials.create(ssl);
-            } catch (SSLException e) {
-                throw new IllegalStateException("Cannot build gRPC channel credentials", e);
-            }
+            SslBundle bundle = sslBundles.getBundle(bundleName);
+            return TlsChannelCredentials.newBuilder()
+                    .keyManager(keyManager)
+                    .trustManager(bundle.getManagers().getTrustManagerFactory().getTrustManagers())
+                    .build();
         };
     }
 
@@ -78,8 +69,15 @@ class ClientConfiguration {
         String password = bundle.getStores().getKeyStorePassword();
         char[] passChars = (password != null) ? password.toCharArray() : new char[0];
 
-        X509Certificate cert = (X509Certificate) keyStore.getCertificate(aliasName);
-        X509Certificate[] x509Certs = List.of(cert).toArray(new X509Certificate[0]);
+        // Fetch the full certificate chain instead of just the leaf certificate
+        assert keyStore != null;
+        java.security.cert.Certificate[] certChain = keyStore.getCertificateChain(aliasName);
+
+        // Convert to X509Certificate array
+        X509Certificate[] x509Certs = new X509Certificate[certChain.length];
+        for (int i = 0; i < certChain.length; i++) {
+            x509Certs[i] = (X509Certificate) certChain[i];
+        }
         PrivateKey key = (PrivateKey) keyStore.getKey(aliasName, passChars);
         keyManager.updateIdentityCredentials(x509Certs, key);
 
