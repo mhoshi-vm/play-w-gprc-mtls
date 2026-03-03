@@ -1,5 +1,6 @@
 package jp.broadcom.tanzu.mhoshi.client;
 
+import io.grpc.ManagedChannel;
 import jp.broadcom.tanzu.mhoshi.server.proto.SimpleGrpc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,7 +12,12 @@ import java.security.*;
 class ClientConfiguration {
 
     @Bean
-    SimpleGrpc.SimpleBlockingStub stub(GrpcChannelFactory channels) {
-        return SimpleGrpc.newBlockingStub(channels.createChannel("local"));
+    ManagedChannel localChannel(GrpcChannelFactory channels) {
+        return channels.createChannel("local");
+    }
+
+    @Bean
+    SimpleGrpc.SimpleBlockingStub stub(ManagedChannel localChannel) {
+        return SimpleGrpc.newBlockingStub(localChannel);
     }
 }
