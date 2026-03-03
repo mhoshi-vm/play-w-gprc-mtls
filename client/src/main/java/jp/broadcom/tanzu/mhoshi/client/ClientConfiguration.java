@@ -11,13 +11,14 @@ import java.security.*;
 @Configuration
 class ClientConfiguration {
 
-    @Bean
-    ManagedChannel localChannel(GrpcChannelFactory channels) {
-        return channels.createChannel("local");
-    }
+	@Bean
+	ManagedChannel localChannel(GrpcChannelFactory channels) {
+		return channels.createChannel("local");
+	}
 
-    @Bean
-    SimpleGrpc.SimpleBlockingStub stub(ManagedChannel localChannel) {
-        return SimpleGrpc.newBlockingStub(localChannel);
-    }
+	@Bean
+	SimpleGrpc.SimpleBlockingStub stub(ManagedChannel localChannel) {
+		return SimpleGrpc.newBlockingStub(localChannel);
+	}
+
 }

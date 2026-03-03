@@ -19,42 +19,41 @@ import java.security.cert.X509Certificate;
 @ConditionalOnProperty(name = "cf.bundle.name")
 class CfSecurityConfig {
 
-    @Bean
-    @GlobalServerInterceptor
-    AuthenticationProcessInterceptor jwtSecurityFilterChain(GrpcSecurity grpc) throws Exception {
-        return grpc
-                .authorizeRequests(requests -> requests
-                        .methods("Simple/SayHello").hasAnyAuthority("ROLE_APP")
-                        .allRequests().permitAll())
-                .authenticationExtractor(new CfIdentityExtractor())
-                .preauth(Customizer.withDefaults())
-                .build();
-    }
+	@Bean
+	@GlobalServerInterceptor
+	AuthenticationProcessInterceptor jwtSecurityFilterChain(GrpcSecurity grpc) throws Exception {
+		return grpc.authorizeRequests(
+				requests -> requests.methods("Simple/SayHello").hasAnyAuthority("ROLE_APP").allRequests().permitAll())
+			.authenticationExtractor(new CfIdentityExtractor())
+			.preauth(Customizer.withDefaults())
+			.build();
+	}
 
-    @Bean
-    CfCertificate serverCfCertificate(SslBundles sslBundles,
-                                      @Value("${cf.bundle.name}") String bundleName,
-                                      @Value("${spring.ssl.bundle.pem.${cf.bundle.name}.key.alias}") String aliasName) {
+	@Bean
+	CfCertificate serverCfCertificate(SslBundles sslBundles, @Value("${cf.bundle.name}") String bundleName,
+			@Value("${spring.ssl.bundle.pem.${cf.bundle.name}.key.alias}") String aliasName) {
 
-        SslBundle bundle = sslBundles.getBundle(bundleName);
-        KeyStore keyStore = bundle.getStores().getKeyStore();
+		SslBundle bundle = sslBundles.getBundle(bundleName);
+		KeyStore keyStore = bundle.getStores().getKeyStore();
 
-        try {
-            X509Certificate cert = null;
-            if (keyStore != null) {
-                cert = (X509Certificate) keyStore.getCertificate(aliasName);
-            }
-            if (cert != null) {
-                return new CfCertificate(cert);
-            }
-        } catch (Exception e) {
-            return null;
-        }
-        return null;
-    }
+		try {
+			X509Certificate cert = null;
+			if (keyStore != null) {
+				cert = (X509Certificate) keyStore.getCertificate(aliasName);
+			}
+			if (cert != null) {
+				return new CfCertificate(cert);
+			}
+		}
+		catch (Exception e) {
+			return null;
+		}
+		return null;
+	}
 
-    @Bean
-    public UserDetailsService userDetailsService(CfCertificate serverCertificate) {
-        return username -> CfIdentity.of(username, serverCertificate);
-    }
+	@Bean
+	public UserDetailsService userDetailsService(CfCertificate serverCertificate) {
+		return username -> CfIdentity.of(username, serverCertificate);
+	}
+
 }

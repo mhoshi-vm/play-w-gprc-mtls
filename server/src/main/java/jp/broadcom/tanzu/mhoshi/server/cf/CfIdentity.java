@@ -10,48 +10,49 @@ import java.util.Objects;
 
 record CfIdentity(CfCertificate cfCertificate, CfCertificate serverCertificate) implements UserDetails {
 
-    public static CfIdentity of(String subject, CfCertificate serverCertificate) {
-        return new CfIdentity(new CfCertificate(subject), serverCertificate);
-    }
+	public static CfIdentity of(String subject, CfCertificate serverCertificate) {
+		return new CfIdentity(new CfCertificate(subject), serverCertificate);
+	}
 
-    @Override
-    @NullMarked
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        if (cfCertificate.matchesSpace(serverCertificate)) {
-            return AuthorityUtils.createAuthorityList("ROLE_APP");
-        }
-        return AuthorityUtils.NO_AUTHORITIES;
-    }
+	@Override
+	@NullMarked
+	public Collection<? extends GrantedAuthority> getAuthorities() {
+		if (cfCertificate.matchesSpace(serverCertificate)) {
+			return AuthorityUtils.createAuthorityList("ROLE_APP");
+		}
+		return AuthorityUtils.NO_AUTHORITIES;
+	}
 
-    @Override
-    public String getPassword() {
-        return "";
-    }
+	@Override
+	public String getPassword() {
+		return "";
+	}
 
-    @Override
-    @NullMarked
-    public String getUsername() {
-        return cfCertificate.subject();
-    }
+	@Override
+	@NullMarked
+	public String getUsername() {
+		return cfCertificate.subject();
+	}
 
-    @Override
-    public boolean equals(Object obj) {
-        if (obj == this)
-            return true;
-        if (obj == null || obj.getClass() != this.getClass())
-            return false;
-        var that = (CfIdentity) obj;
-        return Objects.equals(this.cfCertificate.subject(), that.cfCertificate.subject());
-    }
+	@Override
+	public boolean equals(Object obj) {
+		if (obj == this)
+			return true;
+		if (obj == null || obj.getClass() != this.getClass())
+			return false;
+		var that = (CfIdentity) obj;
+		return Objects.equals(this.cfCertificate.subject(), that.cfCertificate.subject());
+	}
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(this.cfCertificate.subject());
-    }
+	@Override
+	public int hashCode() {
+		return Objects.hash(this.cfCertificate.subject());
+	}
 
-    @Override
-    public String toString() {
-        return "CfApp{orgGuid='%s', spaceGuid='%s', appGuid='%s'}".formatted(cfCertificate.appGuid(), cfCertificate.spaceGuid(), cfCertificate.organizationGuid());
-    }
+	@Override
+	public String toString() {
+		return "CfApp{orgGuid='%s', spaceGuid='%s', appGuid='%s'}".formatted(cfCertificate.appGuid(),
+				cfCertificate.spaceGuid(), cfCertificate.organizationGuid());
+	}
 
 }
