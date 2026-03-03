@@ -65,11 +65,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>Initial gRPC call → client cert serial N recorded by a server interceptor.</li>
  *   <li>New client cert (signed by the same ephemeral CA) is atomically written to the
  *       watched files, triggering Spring Boot's file-watcher.</li>
- *   <li>A {@link CountDownLatch} fires when the {@link SslBundles} update handler runs after
- *       the file-watcher detects the change.</li>
- *   <li>A fresh {@link ManagedChannel} is opened (no TLS session cache).  The new Netty
- *       {@code SslContext} is built post-rotation with the rotated key/cert extracted from the
- *       key manager, so the very first handshake presents the rotated cert.</li>
+ *   <li>Spring Boot's file-watcher fires the {@code certRotationListener} bundle update handler
+ *       first: it pushes the new key/cert into the key manager, invalidates all entries in the
+ *       JDK SSL client-session cache (preventing TLS session-ticket resumption from replaying
+ *       the old cert), and calls {@link ManagedChannel#enterIdle()} to close the existing
+ *       HTTP/2 connection.  A test {@link CountDownLatch} registered as the next handler then
+ *       fires to unblock the test thread.</li>
  *   <li>Second gRPC call → server records serial M ≠ N, proving hot-reload works end-to-end.
  *       </li>
  * </ol>
