@@ -1,0 +1,81 @@
+package jp.broadcom.tanzu.mhoshi.client.cf;
+
+import io.grpc.TlsChannelCredentials;
+import io.grpc.util.AdvancedTlsX509KeyManager;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.ssl.SslBundle;
+import org.springframework.boot.ssl.SslBundles;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.grpc.client.ChannelCredentialsProvider;
+
+import java.security.*;
+import java.security.cert.X509Certificate;
+
+@Configuration
+@ConditionalOnProperty(name="spring.grpc.client.channels.local.ssl.bundle")
+class CfClientCertificateConfig {
+
+    Logger log = LoggerFactory.getLogger(CfClientCertificateConfig.class);
+
+    @Bean
+    public AdvancedTlsX509KeyManager grpcKeyManager(SslBundles sslBundles,
+                                                    @Value("${spring.grpc.client.channels.local.ssl.bundle}") String bundleName,
+                                                    @Value("${spring.ssl.bundle.pem.${spring.grpc.client.channels.local.ssl.bundle}.key.alias}") String aliasName
+    ) throws Exception {
+        AdvancedTlsX509KeyManager keyManager = new AdvancedTlsX509KeyManager();
+
+        SslBundle initialBundle = sslBundles.getBundle(bundleName);
+        updateKeyManager(keyManager, initialBundle, aliasName);
+
+        sslBundles.addBundleUpdateHandler(bundleName, updatedBundle -> {
+            try {
+                log.info("SSL Bundle updated, updating key manager");
+                updateKeyManager(keyManager, updatedBundle, aliasName);
+            } catch (KeyStoreException | UnrecoverableKeyException | NoSuchAlgorithmException e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        return keyManager;
+    }
+
+    @Bean
+    ChannelCredentialsProvider grpcChannelCredentialsProvider(SslBundles sslBundles,
+                                                              @Value("${spring.grpc.client.channels.local.ssl.bundle}") String bundleName,
+                                                              AdvancedTlsX509KeyManager keyManager) {
+
+        return channelName -> {
+            SslBundle bundle = sslBundles.getBundle(bundleName);
+            return TlsChannelCredentials.newBuilder()
+                    .keyManager(keyManager)
+                    .trustManager(bundle.getManagers().getTrustManagerFactory().getTrustManagers())
+                    .build();
+        };
+    }
+
+    private void updateKeyManager(AdvancedTlsX509KeyManager keyManager, SslBundle bundle,
+                                  String aliasName) throws KeyStoreException, UnrecoverableKeyException, NoSuchAlgorithmException {
+
+        KeyStore keyStore = bundle.getStores().getKeyStore();
+        String password = bundle.getStores().getKeyStorePassword();
+        char[] passChars = (password != null) ? password.toCharArray() : new char[0];
+
+        // Fetch the full certificate chain instead of just the leaf certificate
+        assert keyStore != null;
+        java.security.cert.Certificate[] certChain = keyStore.getCertificateChain(aliasName);
+
+        // Convert to X509Certificate array
+        X509Certificate[] x509Certs = new X509Certificate[certChain.length];
+        for (int i = 0; i < certChain.length; i++) {
+            x509Certs[i] = (X509Certificate) certChain[i];
+        }
+        PrivateKey key = (PrivateKey) keyStore.getKey(aliasName, passChars);
+        keyManager.updateIdentityCredentials(x509Certs, key);
+
+    }
+}
